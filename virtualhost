@@ -1,0 +1,159 @@
+#!/usr/bin/env ruby
+require "rubygems" # ruby1.9 doesn't "require" it though
+require "thor"
+require "thor/actions"
+
+module VH
+  
+  def self.config_file
+    "/private/etc/apache2/extra/httpd-vhosts.conf"
+  end
+  
+  def self.httpd_file
+    "/etc/apache2/httpd.conf"
+  end
+  
+  def self.hosts_file
+    "/etc/hosts"
+  end
+  
+  def self.scape_string string
+    chars = {"." => "_"}
+    chars.map { |k,c| string.sub! k , c }
+    string.downcase
+  end
+  
+  def self.sudo_error name
+    "You don't have permission to update /etc/hosts... Try using sudo:\n\tsudo -E virtualhost #{name}\nDone."
+  end
+  
+  class VirtualHosts < Thor
+    include Thor::Actions
+    
+   
+    desc :new, "Create new vhost entry"
+    method_option :path,     :aliases  => "-p",
+                             :desc     => "Caminho absoluto da pasta root dos arquivos"
+    method_option :url,      :aliases  => "-u",
+                             :desc     => "URL adicionada para acessor direto pelo browser"
+    method_option :name,     :aliases  => "-n",
+                             :desc     => "Nome de configuracao usado para exclusao"
+    method_option :servers,  :aliases  => "-s",
+                             :type     => :array,
+                             :default  => ["127.0.0.1"],
+                             :desc     => "Enderecos de ip, que o servidor aceitara acessos"
+    def new
+      path     = if options[:path]    then options[:path]    else ask "Entre com o caminho absoluto da pasta dos arquivos:" end
+      url      = if options[:url]     then options[:url]     else ask "Entre com a url desejada:" end
+      port     = if options[:port]    then options[:port]    else 80 end
+      name     = if options[:name]    then options[:name]    else "#{url}" end
+      servers  = if options[:servers] then options[:servers] else ["127.0.0.1"] end
+      
+      name = VH::scape_string name
+      entry_hosts = "\n##<virtualhost #{name}>\n127.0.0.1\t#{url}\n##</virtualhost #{name}>\n"
+      
+      begin
+        append_to_file VH::hosts_file, entry_hosts
+        
+        entry_vh =  %`\n##<virtualhost #{name}>\n\n`
+        servers.each do |server|
+          entry_vh << %`<VirtualHost #{server}:#{port}>\n`
+          entry_vh << %`\tDocumentRoot "#{File.expand_path path}"\n`
+          entry_vh << %`\tServerName #{url}\n\n`
+          entry_vh << %`\t<Directory #{File.expand_path path}>\n`
+          entry_vh << %`\t\tAllowOverride All\n`
+          entry_vh << %`\t\tOrder allow,deny\n`
+          entry_vh << %`\t\tAllow from all\n`
+          entry_vh << %`\t</Directory>\n`
+          entry_vh << %`</VirtualHost>\n\n`
+        end  
+        entry_vh << %`##</virtualhost #{name}>`
+        append_to_file VH::config_file, entry_vh
+        
+        run "apachectl restart"
+      rescue
+        say VH::sudo_error("new"), :red
+        exit 1
+      end
+      
+      say "-------------------------------------------------------------------------------------"
+      say "Conteudo inserido no arquivo: #{VH::hosts_file}", :green
+      say ""
+      puts entry_hosts
+      say "-------------------------------------------------------------------------------------"
+      say "Conteudo inserido no arquivo: #{VH::config_file}", :green
+      say ""
+      puts entry_vh
+      say "-------------------------------------------------------------------------------------"
+      say "Finish", :green
+    end
+    
+    desc "clean NAME", "Limpa uma entrada dos arquivos de hosts de virtualhosts"
+    def clean name
+      entry = "/\n##\\<virtualhost #{name}\\>.*\\<\\/virtualhost #{name}\\>$/m"
+      begin
+        gsub_file VH::hosts_file,  eval(entry), ''
+        gsub_file VH::config_file, eval(entry), ''
+      rescue
+        say VH::sudo_error("clean NAME"), :red
+        exit 1
+      end
+      say "Files cleaning, for name content: #{name}", :green
+      say "Finish.", :green 
+    end
+    
+    desc :clean_all, "Limpa o arquivo de virtual hosts"
+    def clean_all
+      begin
+        say "Limpando a partir do arquivo: #{VH::config_file}"
+        reg = /^##\<virtualhost (?<name>[\w]*)\>$/
+        begin
+          config_file = File.read VH::config_file
+          match = reg.match config_file
+          invoke clean match[:name] if match
+          $stdout.flush
+        end while match
+        say_status "Finish clean form: #{VH::config_file}"
+        say "Limpando a partir do arquivo: #{VH::hosts_file}"
+        begin
+          hosts_file = File.read VH::hosts_file
+          match = reg.match hosts_file
+          invoke clean match[:name] if match
+          $stdout.flush
+        end while match
+        say_status "Finish clean form: #{VH::hosts_file}"
+        
+        say "Clean all files", :green
+        say "Finish.", :green
+      # rescue
+      #   say VH::sudo_error("clean_all"), :red
+      #   exit 1
+      end
+    end
+    
+    desc :default, "Mostra as configuracoes padrao de uso"
+    def default
+      puts %`------------------------------------------------------------------------------------------------------`
+      puts %`- Arquivo de configuracao do apache:          #{VH::httpd_file}`
+      puts %`-`
+      puts %`- Arquivo de configuracao dos virtuais hosts: #{VH::config_file}`
+      puts %`-`
+      puts %`- Arquivo de configuracao dos ips dos hosts:  #{VH::hosts_file}`
+      puts %`------------------------------------------------------------------------------------------------------`
+    end
+    
+    desc :doctor, "Descomenta a linha de configuracao ao arquivo do apache"
+    def doctor
+      begin
+        uncomment_lines VH::httpd_file, "Include #{VH::config_file}"
+        run "apachectl restart"
+      rescue
+        say VH::sudo_error("doctor"), :red
+        exit 1
+      end
+    end
+    
+  end
+end
+
+VH::VirtualHosts.start 
