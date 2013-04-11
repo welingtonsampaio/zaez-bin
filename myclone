@@ -1,0 +1,45 @@
+#!/usr/bin/env ruby
+require "rubygems" # ruby1.9 doesn't "require" it though
+require "thor"
+require "thor/actions"
+
+module Clone
+  class Clone < Thor
+    include Thor::Actions
+    
+   
+    desc :bootstrap, "Clone bootstrap files to specify folder"
+    method_option :path,     :aliases  => "-p",
+                             :desc     => "Absolute path to clone files"
+    def bootstrap
+      uri  = 'https://raw.github.com/jlong/sass-twitter-bootstrap/master/lib'
+      path = '.'
+      path = if options[:path] then options[:path] else ask "Enter with absolute path to clone files (default current path):" end
+      path = File.expand_path path
+      path.concat "/bootstrap"
+      
+      files = %w"_accordion.scss _alerts.scss _breadcrumbs.scss _button-groups.scss _buttons.scss _carousel.scss _close.scss _code.scss _component-animations.scss _dropdowns.scss _forms.scss _grid.scss _hero-unit.scss _labels-badges.scss _layouts.scss _media.scss _mixins.scss _modals.scss _navbar.scss _navs.scss _pager.scss _pagination.scss _popovers.scss _progress-bars.scss _reset.scss _responsive-1200px-min.scss _responsive-767px-max.scss _responsive-768px-979px.scss _responsive-navbar.scss _responsive-utilities.scss _scaffolding.scss _sprites.scss _tables.scss _thumbnails.scss _tooltip.scss _type.scss _utilities.scss _variables.scss _wells.scss bootstrap.scss responsive.scss"
+      
+      say "+------------------------------------------------------------------------------------"
+      say ""
+      say "Preparing environment and folders", :green
+
+      remove_dir path if File.exist? path
+      empty_directory path
+
+      say ""
+      say "+------------------------------------------------------------------------------------"
+      say ""
+      say "Clonando os arquivos", :green
+      files.each do |file|
+        get "#{uri}/#{file}", "#{path}/#{file}"
+      end
+      say ""
+      say "+------------------------------------------------------------------------------------"
+      say ""
+      say "Finish", :green
+    end
+  end
+end
+
+Clone::Clone.start

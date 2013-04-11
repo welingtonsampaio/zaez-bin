@@ -56,17 +56,15 @@ module VH
         append_to_file VH::hosts_file, entry_hosts
         
         entry_vh =  %`\n##<virtualhost #{name}>\n\n`
-        servers.each do |server|
-          entry_vh << %`<VirtualHost *:#{port}>\n`
-          entry_vh << %`\tDocumentRoot "#{File.expand_path path}"\n`
-          entry_vh << %`\tServerName #{url}\n\n`
-          entry_vh << %`\t<Directory #{File.expand_path path}>\n`
-          entry_vh << %`\t\tAllowOverride All\n`
-          entry_vh << %`\t\tOrder allow,deny\n`
-          entry_vh << %`\t\tAllow from all\n`
-          entry_vh << %`\t</Directory>\n`
-          entry_vh << %`</VirtualHost>\n\n`
-        end  
+        entry_vh << %`<VirtualHost *:#{port}>\n`
+        entry_vh << %`\tDocumentRoot "#{File.expand_path path}"\n`
+        entry_vh << %`\tServerName #{url}\n\n`
+        entry_vh << %`\t<Directory #{File.expand_path path}>\n`
+        entry_vh << %`\t\tAllowOverride All\n`
+        entry_vh << %`\t\tOrder allow,deny\n`
+        entry_vh << %`\t\tAllow from all\n`
+        entry_vh << %`\t</Directory>\n`
+        entry_vh << %`</VirtualHost>\n\n`
         entry_vh << %`##</virtualhost #{name}>`
         append_to_file VH::config_file, entry_vh
         
